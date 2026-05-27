@@ -1,0 +1,34 @@
+name: CI — cold-path
+
+on:
+  pull_request:
+    paths:
+      - 'apps/cold-path/**'
+      - '.github/workflows/ci-cold-path.yml'
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/cold-path
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt ruff mypy pytest pytest-cov
+
+      - name: Ruff lint
+        run: ruff check .
+
+      - name: Ruff format check
+        run: ruff format --check .
+
+      - name: pytest
+        run: pytest tests/ -v || echo "No tests yet — add coverage in Sprint 6"

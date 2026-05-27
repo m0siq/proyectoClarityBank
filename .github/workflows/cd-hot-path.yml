@@ -1,0 +1,96 @@
+name: CD — hot-path
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/hot-path/**'
+
+permissions:
+  id-token: write   # needed for OIDC federated credential
+  contents: read
+
+env:
+  ACR_REGISTRY: crbanking${{ vars.ENV }}.azurecr.io
+  IMAGE_NAME: hot-path
+
+jobs:
+  build-push-deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ vars.ENV || 'dev' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC — no password)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Login to ACR
+        run: az acr login --name crbanking${{ vars.ENV }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/hot-path
+          push: true
+          tags: |
+            ${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+      - name: Deploy new revision to Container Apps
+        run: |
+          az containerapp update \
+            --name aca-hotpath-${{ vars.ENV }} \
+            --resource-group rg-banking-${{ vars.ENV }} \
+            --image ${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            --revision-suffix ${{ github.sha }}
+
+      - name: Smoke test — poll /ready for 60s
+        run: |
+          APP_URL=$(az containerapp show \
+            --name aca-hotpath-${{ vars.ENV }} \
+            --resource-group rg-banking-${{ vars.ENV }} \
+            --query properties.configuration.ingress.fqdn -o tsv)
+
+          for i in $(seq 1 12); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://$APP_URL/ready" || echo "000")
+            if [ "$STATUS" = "200" ]; then
+              echo "✅ /ready returned 200"
+              exit 0
+            fi
+            echo "⏳ Attempt $i: got $STATUS, waiting 5s..."
+            sleep 5
+          done
+          echo "❌ /ready never returned 200 — rolling back"
+          exit 1
+
+      - name: Promote new revision to 100% traffic
+        run: |
+          NEW_REVISION=$(az containerapp revision list \
+            --name aca-hotpath-${{ vars.ENV }} \
+            --resource-group rg-banking-${{ vars.ENV }} \
+            --query "[?ends_with(name, '${{ github.sha }}')].name | [0]" -o tsv)
+
+          az containerapp ingress traffic set \
+            --name aca-hotpath-${{ vars.ENV }} \
+            --resource-group rg-banking-${{ vars.ENV }} \
+            --revision-weight "$NEW_REVISION=100"
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          PREV_REVISION=$(az containerapp revision list \
+            --name aca-hotpath-${{ vars.ENV }} \
+            --resource-group rg-banking-${{ vars.ENV }} \
+            --query "[?!ends_with(name, '${{ github.sha }}')].name | [0]" -o tsv)
+
+          az containerapp ingress traffic set \
+            --name aca-hotpath-${{ vars.ENV }} \
+            --resource-group rg-banking-${{ vars.ENV }} \
+            --revision-weight "$PREV_REVISION=100"
+
+          echo "🔄 Rolled back to $PREV_REVISION"

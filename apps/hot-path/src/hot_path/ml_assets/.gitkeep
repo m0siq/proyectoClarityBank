@@ -1,0 +1,2 @@
+# ml_assets directory — fastText model downloaded here at runtime
+# The actual .bin file is excluded from git (see .gitignore)

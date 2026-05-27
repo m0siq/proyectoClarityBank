@@ -1,0 +1,19 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandComponent.schema.json
+name: extract_feedback
+display_name: Extract Feedback Records
+version: "0.1.0"
+type: command
+inputs:
+  year_month:
+    type: string
+outputs:
+  feedback_parquet:
+    type: uri_file
+environment:
+  conda_file: conda.yaml
+  image: mcr.microsoft.com/azureml/openmpi4.1.0-ubuntu20.04
+code: .
+command: >-
+  python extract.py
+  --output-path ${{outputs.feedback_parquet}}
+  --year-month ${{inputs.year_month}}

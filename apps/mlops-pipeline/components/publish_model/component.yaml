@@ -1,0 +1,18 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandComponent.schema.json
+name: publish_model
+display_name: Publish fastText Model
+version: "0.1.0"
+type: command
+inputs:
+  model_path:
+    type: uri_file
+  metrics_path:
+    type: uri_file
+environment:
+  conda_file: conda.yaml
+  image: mcr.microsoft.com/azureml/openmpi4.1.0-ubuntu20.04
+code: .
+command: >-
+  python publish.py
+  --model-path ${{inputs.model_path}}
+  --metrics-path ${{inputs.metrics_path}}

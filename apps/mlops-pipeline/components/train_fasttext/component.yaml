@@ -1,0 +1,25 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandComponent.schema.json
+name: train_fasttext
+display_name: Train fastText Classifier
+version: "0.1.0"
+type: command
+inputs:
+  feedback_parquet:
+    type: uri_file
+  historical_parquet:
+    type: uri_file
+    optional: true
+outputs:
+  model_path:
+    type: uri_file
+  metrics_path:
+    type: uri_file
+environment:
+  conda_file: conda.yaml
+  image: mcr.microsoft.com/azureml/openmpi4.1.0-ubuntu20.04
+code: .
+command: >-
+  python train.py
+  --feedback-path ${{inputs.feedback_parquet}}
+  --output-model-path ${{outputs.model_path}}
+  --output-metrics-path ${{outputs.metrics_path}}

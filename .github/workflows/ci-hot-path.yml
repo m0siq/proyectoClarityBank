@@ -1,0 +1,54 @@
+name: CI — hot-path
+
+on:
+  pull_request:
+    paths:
+      - 'apps/hot-path/**'
+      - 'shared/**'
+      - '.github/workflows/ci-hot-path.yml'
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/hot-path
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Ruff lint
+        run: ruff check src/
+
+      - name: Ruff format check
+        run: ruff format --check src/
+
+      - name: MyPy type check
+        run: mypy src/hot_path/
+
+      - name: pytest with coverage
+        run: pytest --cov=src/hot_path --cov-fail-under=80 tests/unit/
+
+      - name: Build Docker image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/hot-path
+          push: false
+          tags: hot-path:ci
+
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: hot-path:ci
+          format: 'table'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'

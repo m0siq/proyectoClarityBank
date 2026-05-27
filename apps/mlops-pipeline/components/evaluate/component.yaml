@@ -1,0 +1,19 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandComponent.schema.json
+name: evaluate_model
+display_name: Evaluate fastText Model
+version: "0.1.0"
+type: command
+inputs:
+  new_metrics_path:
+    type: uri_file
+  baseline_metrics_path:
+    type: uri_file
+    optional: true
+environment:
+  conda_file: conda.yaml
+  image: mcr.microsoft.com/azureml/openmpi4.1.0-ubuntu20.04
+code: .
+command: >-
+  python evaluate.py
+  --new-metrics-path ${{inputs.new_metrics_path}}
+  $[[--baseline-metrics-path ${{inputs.baseline_metrics_path}}]]
