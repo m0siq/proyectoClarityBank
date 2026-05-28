@@ -22,6 +22,8 @@ WORKDIR /app
 COPY --from=builder /install /usr/local
 COPY src/ /app/src/
 
+RUN mkdir -p /app/ml_assets && chown -R 1000:1000 /app/ml_assets
+
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app/src
