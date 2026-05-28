@@ -6,8 +6,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /build
 COPY pyproject.toml .
-RUN pip install --no-cache-dir --prefix=/install fasttext==0.9.3 && \
-    pip install --no-cache-dir --prefix=/install -e .
+COPY src/ src/
+RUN pip install --no-binary fasttext --no-cache-dir --prefix=/install fasttext==0.9.3 && \
+    pip install --no-cache-dir --prefix=/install .
 
 # ────────────────────────────────────────────────────────────────────────────
 FROM python:3.11-slim
