@@ -1,10 +1,11 @@
 """Transaction pipeline orchestrator (SPEC §5.9).
 
 Composes the 4 stages:
-  A. Anomaly detection (Z-Score)
+  A. Amount anomaly detection (Z-Score)
   B. L1 classification (fastText)
-  C. Conditional L2 classification (Azure OpenAI) if L1 confidence < threshold
-  D. Feedback recording (fire-and-forget)
+  C. Merchant novelty anomaly signal from L1 confidence/category
+  D. Conditional L2 classification (Azure OpenAI) if L1 confidence < threshold
+  E. Feedback recording (fire-and-forget)
 
 This class performs NO I/O directly — all I/O is injected via repositories.
 """
@@ -55,7 +56,7 @@ class TransactionPipeline:
         """
         t0 = time.perf_counter()
 
-        # Stage A: Anomaly detection
+        # Stage A: Amount anomaly detection
         profile = await self._profiles.get(tx.user_id)
         anomaly_result = self._anomaly.detect(tx, profile)
 
@@ -63,7 +64,10 @@ class TransactionPipeline:
         l1_result = self._l1.classify(tx)
         record_l1_confidence(l1_result.confidence)
 
-        # Stage C: Conditional L2 fallback
+        # Stage C: Merchant novelty anomaly signal.
+        anomaly_result = self._anomaly.add_merchant_signal(anomaly_result, tx, l1_result)
+
+        # Stage D: Conditional L2 fallback
         final_category = l1_result.category
         final_classifier = "l1"
         final_confidence = l1_result.confidence
@@ -74,7 +78,7 @@ class TransactionPipeline:
             final_classifier = "l2"
             final_confidence = 1.0  # by convention, L2 does not expose confidence score
 
-            # Stage D: Fire-and-forget feedback for MLOps retraining
+            # Stage E: Fire-and-forget feedback for MLOps retraining
             asyncio.create_task(
                 self._feedback.record(tx, l1_result, l2_result),
                 name=f"feedback_{tx.transaction_id}",
