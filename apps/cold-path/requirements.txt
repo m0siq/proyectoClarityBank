@@ -2,5 +2,6 @@ azure-functions==1.21.*
 azure-functions-durable==1.2.*
 azure-cosmos==4.7.*
 openai==1.54.*
+httpx==0.27.*
 azure-identity==1.19.*
 pydantic==2.9.*
