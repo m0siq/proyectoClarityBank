@@ -19,7 +19,7 @@ from uuid import uuid4
 
 import pytest
 
-from hot_path.domain.models import AnomalyResult, Transaction, UserProfile
+from hot_path.domain.models import AnomalyResult, Category, ClassificationL1, Transaction, UserProfile
 from hot_path.services.anomaly import AnomalyDetector
 
 
@@ -110,3 +110,37 @@ class TestAnomalyDetector:
         result = self.detector.detect(tx, profile)
         assert result.is_anomaly is False
         assert result.z_score < 0
+
+    def test_low_confidence_other_merchant_is_anomaly(self) -> None:
+        """Very low-confidence OTHER labels indicate merchant novelty/OOD."""
+        tx = make_tx("-30.00", merchant="XyzXyzXyz.xyz")
+        amount_result = AnomalyResult(is_anomaly=False, z_score=0.0)
+        l1 = ClassificationL1(category=Category.OTHER, confidence=0.20, model_version="test")
+
+        result = self.detector.add_merchant_signal(amount_result, tx, l1)
+
+        assert result.is_anomaly is True
+        assert result.reason is not None
+        assert "fuera de distribución" in result.reason
+
+    def test_known_category_low_confidence_is_not_merchant_anomaly(self) -> None:
+        """Low confidence alone can trigger L2 without marking an anomaly."""
+        tx = make_tx("-30.00", merchant="MERCADO NUEVO")
+        amount_result = AnomalyResult(is_anomaly=False, z_score=0.0)
+        l1 = ClassificationL1(category=Category.GROCERIES, confidence=0.40, model_version="test")
+
+        result = self.detector.add_merchant_signal(amount_result, tx, l1)
+
+        assert result.is_anomaly is False
+
+    def test_domain_like_merchant_is_anomaly_even_with_known_l1_category(self) -> None:
+        """Domain-like merchant descriptors are unusual even if L1 returns a category."""
+        tx = make_tx("-30.00", merchant="XyzXyzXyz.xyz")
+        amount_result = AnomalyResult(is_anomaly=False, z_score=0.0)
+        l1 = ClassificationL1(category=Category.GROCERIES, confidence=0.92, model_version="test")
+
+        result = self.detector.add_merchant_signal(amount_result, tx, l1)
+
+        assert result.is_anomaly is True
+        assert result.reason is not None
+        assert "formato atípico" in result.reason

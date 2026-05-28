@@ -75,6 +75,7 @@ def make_l2(category: Category = Category.HEALTH) -> ClassificationL2:
 def pipeline() -> TransactionPipeline:
     anomaly = MagicMock(spec=AnomalyDetector)
     anomaly.detect.return_value = AnomalyResult(is_anomaly=False, z_score=0.5)
+    anomaly.add_merchant_signal.side_effect = lambda result, tx, l1: result
 
     l1 = MagicMock()
     l1.classify.return_value = make_l1(confidence=0.95)
@@ -132,6 +133,27 @@ class TestTransactionPipeline:
         result = await pipeline.process(make_tx("-500.00"))
         assert result.anomaly.is_anomaly is True
         assert result.anomaly.z_score == pytest.approx(4.2, abs=0.01)
+
+    @pytest.mark.asyncio
+    async def test_low_confidence_other_marks_merchant_anomaly(
+        self, pipeline: TransactionPipeline
+    ) -> None:
+        pipeline._l1.classify.return_value = make_l1(category=Category.OTHER, confidence=0.20)
+
+        def add_signal(result, tx, l1):
+            return AnomalyResult(
+                is_anomaly=True,
+                z_score=result.z_score,
+                reason="Comercio fuera de distribución",
+            )
+
+        pipeline._anomaly.add_merchant_signal.side_effect = add_signal
+
+        result = await pipeline.process(make_tx("-30.00", "XyzXyzXyz.xyz"))
+
+        assert result.final_classifier == "l2"
+        assert result.anomaly.is_anomaly is True
+        assert result.anomaly.reason == "Comercio fuera de distribución"
 
     @pytest.mark.asyncio
     async def test_pipeline_returns_latency(self, pipeline: TransactionPipeline) -> None:
