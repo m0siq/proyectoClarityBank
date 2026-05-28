@@ -27,25 +27,28 @@ async def persist_insights(results: list[dict]) -> int:
     url = f"https://{cosmos_account}.documents.azure.com:443/"
 
     saved = 0
-    async with CosmosClient(url=url, credential=credential) as client:
-        container = client.get_database_client(database).get_container_client("insights")
+    try:
+        async with CosmosClient(url=url, credential=credential) as client:
+            container = client.get_database_client(database).get_container_client("insights")
 
-        for result in results:
-            user_id = result["user_id"]
-            year_month = result["year_month"]
-            doc = {
-                "id": f"{user_id}_{year_month}",
-                "user_id": user_id,
-                "year_month": year_month,
-                "summary_text": result.get("summary_text", ""),
-                "breakdown": result.get("breakdown", {}),
-                "generated_at": datetime.now(UTC).isoformat(),
-            }
-            try:
-                await container.upsert_item(doc)
-                saved += 1
-            except CosmosHttpResponseError:
-                # Non-critical: log and continue with other users
-                pass
+            for result in results:
+                user_id = result["user_id"]
+                year_month = result["year_month"]
+                doc = {
+                    "id": f"{user_id}_{year_month}",
+                    "user_id": user_id,
+                    "year_month": year_month,
+                    "summary_text": result.get("summary_text", ""),
+                    "breakdown": result.get("breakdown", {}),
+                    "generated_at": datetime.now(UTC).isoformat(),
+                }
+                try:
+                    await container.upsert_item(doc)
+                    saved += 1
+                except CosmosHttpResponseError:
+                    # Non-critical: log and continue with other users
+                    pass
+    finally:
+        await credential.close()
 
     return saved
