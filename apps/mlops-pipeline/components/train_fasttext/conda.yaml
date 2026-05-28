@@ -1,0 +1,12 @@
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+      - fasttext==0.9.3
+      - mlflow==2.19.*
+      - numpy>=1.26,<2.0
+      - pandas==2.2.*
+      - pyarrow==18.1.*
+      - scikit-learn==1.5.*

@@ -1,0 +1,10 @@
+azure-ai-ml==1.23.*
+azure-cosmos==4.7.*
+azure-identity==1.19.*
+azure-storage-blob==12.24.*
+fasttext==0.9.3
+mlflow==2.19.*
+numpy>=1.26,<2.0
+pandas==2.2.*
+pyarrow==18.1.*
+scikit-learn==1.5.*

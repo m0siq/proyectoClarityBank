@@ -1,0 +1,9 @@
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+      - azure-ai-ml==1.23.*
+      - azure-identity==1.19.*
+      - azure-storage-blob==12.24.*

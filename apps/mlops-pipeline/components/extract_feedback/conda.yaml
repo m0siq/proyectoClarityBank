@@ -1,0 +1,10 @@
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+      - azure-cosmos==4.7.*
+      - azure-identity==1.19.*
+      - pandas==2.2.*
+      - pyarrow==18.1.*
